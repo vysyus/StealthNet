@@ -14,7 +14,24 @@
  *                  the source code.
  * VERSION:         1.0-ICE
  *
- * REVISION HISTORY:
+ * REVISION HISTORY:Modified by Juraj Martinak (SID 309128722) and Marius
+ * 					Krämer (SID xxx) to incorporate cryptography for
+ * 					ELEC 5616 programming assignment.
+ * 
+ * 					Modified the following functions:
+ * 
+ * 					mouseReleased(MouseEvent e)
+ * 					- modified to fix right-clicking on linux/mac (thanks Emma)									
+ * 
+ * 
+ * 					login()
+ *					startChat()
+ *					sendFile()
+ *					processPackets() case StealthNetPacket.CMD_CHAT
+ *					processPackets() case StealthNetPacket.CMD_FTP
+ *					- modified all of the above by setting the setSecurity()
+ *					  method of StealthNetComms class to true
+ * 					
  *
  *****************************************************************************/
 
@@ -26,11 +43,6 @@ import javax.swing.*;
 import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.KeyFactory;
-import java.security.NoSuchAlgorithmException;
-import java.security.PublicKey;
-import java.security.spec.X509EncodedKeySpec;
 import java.util.Hashtable;
 
 /* StealthNetClient Class Definition *****************************************/
@@ -47,7 +59,6 @@ public class StealthNetClient {
 	JTextField creditsBox;
 	
     private int credits = 100;		// CHANGEME: Give them 100 credits for demonstration purposes
-	private byte[] clientSharedSecret;
 
 	private class SecretData {
 		String description = null;
@@ -90,6 +101,11 @@ public class StealthNetClient {
 			JPopupMenu popup;
 			int row;
 			String myid, mystatus;
+			
+			// modified this function to support linux/mac right-clicking. Thanks, Emma.
+			public void mousePressed(MouseEvent e) {
+				mouseReleased(e);
+			}
 			
 			public void mouseReleased(MouseEvent e) {
 								
@@ -260,8 +276,7 @@ public class StealthNetClient {
     }
 
     private synchronized void login() {
-        
-    	if (stealthComms != null) {
+        if (stealthComms != null) {
             msgTextBox.append("[*ERR*] Already logged in.\n");
             return;
         }
@@ -271,6 +286,7 @@ public class StealthNetClient {
             if (userID == null) return;
             stealthComms = new StealthNetComms();
             stealthComms.initiateSession(new Socket(StealthNetComms.SERVERNAME, StealthNetComms.SERVERPORT));
+            stealthComms.setSecurity(true);
             stealthComms.sendPacket(StealthNetPacket.CMD_LOGIN, userID);
             stealthTimer.start();
         } catch (UnknownHostException e) {
@@ -442,6 +458,7 @@ public class StealthNetClient {
             chatSocket.setSoTimeout(2000);  // 2 second timeout
             StealthNetComms snComms = new StealthNetComms();
             snComms.acceptSession(chatSocket.accept());
+            snComms.setSecurity(true);
             new StealthNetChat(userID, snComms).start();
         } catch (Exception e) {
             msgTextBox.append("[*ERR*] Chat failed.\n");
@@ -491,6 +508,7 @@ public class StealthNetClient {
             ftpSocket.setSoTimeout(2000);  // 2 second timeout
             StealthNetComms snComms = new StealthNetComms();
             snComms.acceptSession(ftpSocket.accept());
+            snComms.setSecurity(true);
             new StealthNetFileTransfer(snComms,
                 fileOpen.getDirectory() + fileOpen.getFile(), true).start();
         } catch (Exception e) {
@@ -533,6 +551,7 @@ public class StealthNetClient {
                         iAddr = iAddr.substring(0, iAddr.lastIndexOf(":"));
                         snComms = new StealthNetComms();
                         snComms.initiateSession(new Socket(iAddr, iPort.intValue()));
+                        snComms.setSecurity(true);
                         new StealthNetChat(userID, snComms).start();
                         break;
 
@@ -546,6 +565,7 @@ public class StealthNetClient {
 
                         snComms = new StealthNetComms();
                         snComms.initiateSession(new Socket(iAddr, iPort.intValue()));
+                        snComms.setSecurity(true);
 
                         FileDialog fileSave = new FileDialog(clientFrame, "Save As...", FileDialog.SAVE);
                         fileSave.setFile(fName);
@@ -620,32 +640,7 @@ public class StealthNetClient {
 						new StealthNetFileTransfer(snComms,	fName, true).start();
 
 						break;
-						
-					case StealthNetPacket.CMD_KEYRESP : 
-						byte[] serverPubKeyEncForClient = pckt.data;
-						/*
-			             * Client uses Server's public key for the first (and only) phase
-			             * of her version of the DH
-			             * protocol.
-			             * Before she can do so, she has to instantiate a DH public key
-			             * from Server's encoded key material.
-			             */
-			            KeyFactory clientKeyFac = KeyFactory.getInstance("DH");
-			            X509EncodedKeySpec x509KeySpec = new X509EncodedKeySpec(serverPubKeyEncForClient);
-			            PublicKey serverPubKey = clientKeyFac.generatePublic(x509KeySpec);
-			            System.out.println("This is the public server key: "+ serverPubKey);
-			            System.out.println("CLIENT: Execute PHASE1 ...");
-			            stealthComms.getClientKeyAgree().doPhase(serverPubKey, true);
 
-			            /*
-			             * At this stage, both Client and Server have completed the DH key
-			             * agreement protocol.
-			             * Both generate the (same) shared secret.
-			             */
-			            clientSharedSecret = stealthComms.getClientKeyAgree().generateSecret();
-			            System.out.println("This is the shared secret client "+ clientSharedSecret);
-
-			    	
                     default :
                         System.out.println("unrecognised command");
                }
@@ -658,7 +653,7 @@ public class StealthNetClient {
         stealthTimer.start();
     }
 
-    public static void main(String[] args) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
+    public static void main(String[] args) {
         try {
             UIManager.setLookAndFeel(
                 UIManager.getCrossPlatformLookAndFeelClassName());

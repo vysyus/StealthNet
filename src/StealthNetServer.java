@@ -14,7 +14,9 @@
  *                  the source code.
  * VERSION:         1.0-ICE
  *
- * REVISION HISTORY:
+ * REVISION HISTORY:Modified by Juraj Martinak (SID 309128722) and Marius
+ * 					Krämer (SID xxx) to incorporate cryptography for
+ * 					ELEC 5616 programming assignment.
  *
  *****************************************************************************/
 
@@ -35,7 +37,7 @@ public class StealthNetServer {
             System.exit(1);
         }
 
-        System.out.println("Server online...");
+        System.out.println("Server online...JM");
         while (true) {
             new StealthNetServerThread(svrSocket.accept()).start();
             System.out.println("Server accepted connection...");

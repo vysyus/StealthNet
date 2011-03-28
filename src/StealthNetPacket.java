@@ -14,7 +14,9 @@
  *                  the source code.
  * VERSION:         1.0-ICE
  *
- * REVISION HISTORY:
+ * REVISION HISTORY:Modified by Juraj Martinak (SID 309128722) and Marius
+ * 					Krämer (SID xxx) to incorporate cryptography for
+ * 					ELEC 5616 programming assignment.
  *
  **********************************************************************************/
 
@@ -29,8 +31,9 @@ public class StealthNetPacket {
     public static final byte CMD_CREATESECRET = 0x07;
     public static final byte CMD_SECRETLIST = 0x08;
     public static final byte CMD_GETSECRET = 0x09;
-    public static final byte CMD_KEYINIT = 0x10;
-    public static final byte CMD_KEYRESP = 0x11;
+    public static final byte CMD_KEYEX = 0x10;
+    public static final byte CMD_CHECKSUM = 0x11;
+    public static final byte CMD_TOKEN = 0x12;
    
     
     private static final char[] HEXTABLE =
@@ -40,6 +43,13 @@ public class StealthNetPacket {
     byte command;               // command
     byte data[];                // data
 
+    
+    public byte[] getBytes() {
+    	byte[] pcktByteArray = new byte[data.length+1];
+    	pcktByteArray[0] = command;	
+    	System.arraycopy(data, 0, pcktByteArray, 1, data.length);
+    	return pcktByteArray;
+    }
     public StealthNetPacket() {
         command = CMD_NULL;
         data = new byte[0];
@@ -50,6 +60,15 @@ public class StealthNetPacket {
         if (d == null)
             data = new byte[0];
         else data = d;
+    }
+    
+    public StealthNetPacket(byte[] d) {
+    	int i;
+        command = d[0];
+        data = new byte[d.length-1];
+        for(i =1; i < d.length; i++) {
+        	data[i-1] = d[i];
+        }
     }
 
     public StealthNetPacket(String str) {

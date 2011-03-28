@@ -14,7 +14,9 @@
  *                  the source code.
  * VERSION:         1.0-ICE
  *
- * REVISION HISTORY:
+ * REVISION HISTORY:Modified by Juraj Martinak (SID 309128722) and Marius
+ * 					Krämer (SID xxx) to incorporate cryptography for
+ * 					ELEC 5616 programming assignment.
  *
  *****************************************************************************/
 

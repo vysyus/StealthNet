@@ -14,7 +14,9 @@
  *                  the source code.
  * VERSION:         1.0
  *
- * REVISION HISTORY:
+ * REVISION HISTORY:Modified by Juraj Martinak (SID 309128722) and Marius
+ * 					Krämer (SID xxx) to incorporate cryptography for
+ * 					ELEC 5616 programming assignment.
  *
  *****************************************************************************/
 
@@ -22,16 +24,7 @@
 
 import java.io.*;
 import java.net.*;
-import java.security.KeyFactory;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.PublicKey;
-import java.security.spec.X509EncodedKeySpec;
 import java.util.*;
-
-import javax.crypto.KeyAgreement;
-import javax.crypto.interfaces.DHPublicKey;
-import javax.crypto.spec.DHParameterSpec;
 
 /* StealthNetServerThread Class Definition ***********************************/
 
@@ -59,7 +52,7 @@ public class StealthNetServerThread extends Thread {
         super("StealthNetServerThread");
         stealthComms = new StealthNetComms();
         stealthComms.acceptSession(socket);
-        socket.getLocalAddress();
+        stealthComms.setSecurity(true);
     }
 
     protected void finalise() throws IOException {
@@ -192,6 +185,17 @@ public class StealthNetServerThread extends Thread {
                 switch (pckt.command) {
                 case StealthNetPacket.CMD_NULL :
                     System.out.println("received NULL command");
+                    System.out.println(new String(pckt.data));
+                    break;
+                    
+                case StealthNetPacket.CMD_CHECKSUM :
+                    System.out.println("Checksum mismatch");
+                    System.out.println(new String(pckt.data));
+                    break;
+                    
+                case StealthNetPacket.CMD_TOKEN :
+                    System.out.println("Session token mismatch - possible REPLAY ATTACK IN PLACE");
+                    System.out.println(new String(pckt.data));
                     break;
 
                 case StealthNetPacket.CMD_LOGIN :
@@ -345,56 +349,34 @@ public class StealthNetServerThread extends Thread {
 					}
 
 					break;
-				case StealthNetPacket.CMD_KEYINIT :
-					byte[] clientPubKeyEnc = pckt.data;
-					/*
-		             * Let's turn over to Server. Server has received Client's public key
-		             * in encoded format.
-		             * He instantiates a DH public key from the encoded key material.
-		             */
-		            KeyFactory serverKeyFac = KeyFactory.getInstance("DH");
-		            X509EncodedKeySpec x509KeySpec = new X509EncodedKeySpec
-		                (clientPubKeyEnc);
-					System.out.println("Client's public key encoded on server:" + clientPubKeyEnc);
 
-		            PublicKey clientPubKey = serverKeyFac.generatePublic(x509KeySpec);
-					System.out.println("Client's public key on server:" + clientPubKey);
-		            
+				case StealthNetPacket.CMD_KEYEX :
+					System.out.println ("Key Exchange initialised.");
+					if (userID == null) {
+						System.out.println("unknown user initiating key exchange");
+						break;
+					}
+					userKey = new String(pckt.data);
+                    System.out.println(userKey);
+					iAddr =  userKey.substring(userKey.lastIndexOf("@") + 1);
+					userKey = userKey.substring(0, userKey.length() - iAddr.length() - 1);
 					
-					/*
-		             * Server gets the DH parameters associated with Client's public key. 
-		             * He must use the same parameters when he generates his own key
-		             * pair.
-		             */
+					userInfo = (UserData)userList.get(userKey);
 
-		            
-		            DHParameterSpec dhParamSpec = ((DHPublicKey)clientPubKey).getParams();
-
-		            // Server creates his own DH key pair
-		            System.out.println("SERVER: Generate DH keypair ...");
-		            KeyPairGenerator serverKpairGen = KeyPairGenerator.getInstance("DH");
-		            serverKpairGen.initialize(dhParamSpec);
-		            KeyPair serverKpair = serverKpairGen.generateKeyPair();
-		            System.out.println("This is the private server key: "+ serverKpair.getPrivate()+ " and this the public: " + serverKpair.getPublic());
-
-		            // Server creates and initializes his DH KeyAgreement object
-		            System.out.println("SERVER: Initialization ...");
-		            KeyAgreement serverKeyAgree = KeyAgreement.getInstance("DH");
-		            serverKeyAgree.init(serverKpair.getPrivate().);
-
-		            // Server encodes his public key, and sends it over to Client.
-		            byte[] serverPubKeyEnc = serverKpair.getPublic().getEncoded();
-
-		            System.out.println("SERVER: Execute PHASE1 ...");
-		            serverKeyAgree.doPhase(clientPubKey, true);
-		            byte[] serverSharedSecret = serverKeyAgree.generateSecret();
-		            System.out.println("This is server's shared secret: " + serverSharedSecret);
-		            
-					stealthComms.sendPacket(StealthNetPacket.CMD_KEYRESP, serverPubKeyEnc);
-										
-
+					if ((userInfo == null) || (userInfo.userThread == null)) {
+						stealthComms.sendPacket(StealthNetPacket.CMD_MSG,
+							"[*SVR*] Secret is not currently available");
+					} else if (userInfo.userThread == Thread.currentThread()) {
+						stealthComms.sendPacket(StealthNetPacket.CMD_MSG,
+							"[*SVR*] You can't purchase a secret from yourself!");
+					} else {
+						userInfo.userThread.stealthComms.sendPacket(
+							StealthNetPacket.CMD_KEYEX, userID + "@" + iAddr);
+					}
+					
                 default :
                     System.out.println("unrecognised command");
+                    System.out.println(pckt.command);
                 }
             }
         } catch (IOException e) {
